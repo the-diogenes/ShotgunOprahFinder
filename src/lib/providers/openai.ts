@@ -2,6 +2,7 @@ import type { LLMProviderAdapter } from './types'
 import { SYSTEM_PROMPT, buildUserMessage, parseAgentJson, fetchWithRetry } from './types'
 import { calcCostUsd } from '../costs'
 import { logger } from '../logger'
+import { resolveGenerationCaps } from '../providerCaps'
 import type { AgentRequest, AgentResponse } from '../../types'
 
 export const openaiAdapter: LLMProviderAdapter = {
@@ -11,10 +12,11 @@ export const openaiAdapter: LLMProviderAdapter = {
 
   async callAgent(request: AgentRequest, apiKey: string): Promise<AgentResponse> {
     logger.info('api', `OpenAI → ${request.model} | page: "${request.gameState.currentPage.title}" | links: ${request.gameState.currentPage.availableLinks.length} | key: ${apiKey ? apiKey.slice(0,8)+'…' : 'MISSING'}`)
+    const caps = resolveGenerationCaps('openai', request.model, request.maxTokens)
     const body = {
       model: request.model,
       temperature: request.temperature,
-      max_tokens: request.maxTokens,
+      max_tokens: caps.outputTokens,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },

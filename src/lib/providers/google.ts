@@ -2,6 +2,7 @@ import type { LLMProviderAdapter } from './types'
 import { SYSTEM_PROMPT, buildUserMessage, parseAgentJson, fetchWithRetry } from './types'
 import { calcCostUsd } from '../costs'
 import { logger } from '../logger'
+import { resolveGenerationCaps } from '../providerCaps'
 import type { AgentRequest, AgentResponse } from '../../types'
 
 const AGENT_RESPONSE_SCHEMA = {
@@ -15,22 +16,25 @@ const AGENT_RESPONSE_SCHEMA = {
 }
 
 function buildGoogleBody(request: AgentRequest, strictRetry: boolean) {
+  const caps = resolveGenerationCaps('google', request.model, request.maxTokens)
   const userText = strictRetry
     ? `${buildUserMessage(request)}\n\nIMPORTANT: Return ONLY a JSON object with keys chosen_link, public_scratchpad, confidence. No preamble, no markdown.`
     : buildUserMessage(request)
 
+  const generationConfig: Record<string, unknown> = {
+    temperature: request.temperature,
+    maxOutputTokens: caps.outputTokens,
+    responseMimeType: 'application/json',
+    responseSchema: AGENT_RESPONSE_SCHEMA,
+  }
+  if (caps.thinkingBudget !== undefined) {
+    generationConfig.thinkingConfig = { thinkingBudget: caps.thinkingBudget }
+  }
+
   return {
     system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
     contents: [{ role: 'user', parts: [{ text: userText }] }],
-    generationConfig: {
-      temperature: request.temperature,
-      // Gemini 2.5 "thinking" tokens count against maxOutputTokens — without
-      // disabling thinking, the visible JSON can truncate to a few tokens.
-      maxOutputTokens: Math.max(request.maxTokens, 512),
-      responseMimeType: 'application/json',
-      responseSchema: AGENT_RESPONSE_SCHEMA,
-      thinkingConfig: { thinkingBudget: 0 },
-    },
+    generationConfig,
   }
 }
 

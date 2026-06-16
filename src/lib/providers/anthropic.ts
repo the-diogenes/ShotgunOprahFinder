@@ -2,6 +2,7 @@ import type { LLMProviderAdapter } from './types'
 import { SYSTEM_PROMPT, buildUserMessage, parseAgentJson, fetchWithRetry } from './types'
 import { calcCostUsd } from '../costs'
 import { logger } from '../logger'
+import { resolveGenerationCaps } from '../providerCaps'
 import type { AgentRequest, AgentResponse } from '../../types'
 
 export const anthropicAdapter: LLMProviderAdapter = {
@@ -11,10 +12,11 @@ export const anthropicAdapter: LLMProviderAdapter = {
 
   async callAgent(request: AgentRequest, apiKey: string): Promise<AgentResponse> {
     logger.info('api', `Anthropic → ${request.model} | page: "${request.gameState.currentPage.title}" | key: ${apiKey ? apiKey.slice(0,16)+'…' : 'MISSING'}`)
+    const caps = resolveGenerationCaps('anthropic', request.model, request.maxTokens)
     const body = {
       model: request.model,
       temperature: request.temperature,
-      max_tokens: request.maxTokens,
+      max_tokens: caps.outputTokens,
       system: SYSTEM_PROMPT,
       messages: [
         { role: 'user', content: buildUserMessage(request) },

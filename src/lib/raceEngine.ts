@@ -50,6 +50,13 @@ export async function runRacerTurn(
     return
   }
 
+  // Par guard — no Wikipedia fetch or LLM call once quota is spent
+  if (racer.clicks >= maxClicks) {
+    logger.info('engine', `[${racer.competitorName}] Par exceeded (${racer.clicks}/${maxClicks}) — stopping`)
+    onStatus(racer.id, 'dnf_max_clicks')
+    return
+  }
+
   const t0 = Date.now()
 
   let page
