@@ -3,6 +3,7 @@ import { useRace } from '../context/RaceContext'
 import type { CompetitorConfig, RaceConfig, ProviderId } from '../types'
 import { DEFAULT_HOST_PROMPT } from '../lib/raceEngine'
 import { PROVIDERS } from '../lib/providers'
+import { hasSavedKeys } from '../lib/keyStore'
 
 const PROMPT_PRESETS: Record<string, string> = {
   'Aggressive Media': DEFAULT_HOST_PROMPT,
@@ -30,14 +31,16 @@ const DEFAULT_COMPETITORS: CompetitorConfig[] = [
 ]
 
 export default function RaceSetup() {
-  const { setScreen, apiKeys, setApiKeys, startRace } = useRace()
+  const { setScreen, apiKeys, setApiKeys, clearKeys, startRace } = useRace()
   const [maxClicks, setMaxClicks] = useState(8)
   const [hostPrompt, setHostPrompt] = useState(DEFAULT_HOST_PROMPT)
   const [competitors, setCompetitors] = useState<CompetitorConfig[]>(DEFAULT_COMPETITORS)
   const [selectedPreset, setSelectedPreset] = useState('Aggressive Media')
   const [includeSummary, setIncludeSummary] = useState(true)
-  const [showKeys, setShowKeys] = useState(false)
+  const [showKeys, setShowKeys] = useState(!hasSavedKeys(apiKeys))
   const [launching, setLaunching] = useState(false)
+
+  const keysAreSaved = hasSavedKeys(apiKeys)
 
   const toggleCompetitor = (id: string) => {
     setCompetitors((prev) =>
@@ -83,12 +86,27 @@ export default function RaceSetup() {
 
       {/* API Keys */}
       <section className="mb-10">
-        <button
-          onClick={() => setShowKeys((v) => !v)}
-          className="text-xs tracking-widest uppercase border border-white/30 px-4 py-2 hover:border-white mb-4"
-        >
-          {showKeys ? '▼' : '▶'} API KEYS {Object.values(apiKeys).filter(Boolean).length > 0 ? `(${Object.values(apiKeys).filter(Boolean).length} set)` : '(none set)'}
-        </button>
+        <div className="flex items-center gap-4 mb-4">
+          <button
+            onClick={() => setShowKeys((v) => !v)}
+            className="text-xs tracking-widest uppercase border border-white/30 px-4 py-2 hover:border-white"
+          >
+            {showKeys ? '▼' : '▶'} API KEYS
+          </button>
+          {keysAreSaved && (
+            <span className="text-xs text-green-400 tracking-wider">
+              ✓ KEYS SAVED ({Object.values(apiKeys).filter(Boolean).length}/4)
+            </span>
+          )}
+          {keysAreSaved && (
+            <button
+              onClick={() => { clearKeys(); setShowKeys(true) }}
+              className="text-xs text-gray-600 hover:text-red-400 tracking-widest uppercase ml-auto"
+            >
+              CLEAR SAVED KEYS
+            </button>
+          )}
+        </div>
         {showKeys && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 border border-white/20">
             {(['openai', 'anthropic', 'google', 'xai'] as const).map((p) => (
@@ -104,7 +122,7 @@ export default function RaceSetup() {
               </label>
             ))}
             <p className="col-span-full text-xs text-gray-600 mt-1">
-              Keys are stored in browser memory only — never sent to any server except the LLM provider.
+              Keys save automatically to this browser. Never sent anywhere except the LLM provider directly.
             </p>
           </div>
         )}

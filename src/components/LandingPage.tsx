@@ -1,7 +1,10 @@
 import { useRace } from '../context/RaceContext'
+import { hasSavedKeys } from '../lib/keyStore'
 
 export default function LandingPage() {
-  const { setScreen } = useRace()
+  const { setScreen, apiKeys } = useRace()
+  const keysReady = hasSavedKeys(apiKeys)
+  const keyCount = Object.values(apiKeys).filter(Boolean).length
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-16 text-center">
@@ -24,6 +27,12 @@ export default function LandingPage() {
         <p className="text-xs text-gray-500 mb-10">
           Par is 8. Glory is lower.
         </p>
+
+        {keysReady && (
+          <p className="text-xs text-green-400 tracking-wider mb-6">
+            ✓ {keyCount} API KEY{keyCount !== 1 ? 'S' : ''} LOADED
+          </p>
+        )}
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <button

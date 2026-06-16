@@ -3,6 +3,7 @@ import type { ApiKeys, Race, RacerRun, RaceConfig } from '../types'
 import { getRandomPage } from '../lib/wikipedia'
 import { runRacerTurn, makeRacerRun } from '../lib/raceEngine'
 import { saveRace, saveTurn } from '../lib/db'
+import { loadSavedKeys, saveKeys, clearSavedKeys } from '../lib/keyStore'
 
 type Screen = 'landing' | 'setup' | 'race' | 'results'
 
@@ -11,6 +12,7 @@ interface RaceContextValue {
   setScreen: (s: Screen) => void
   apiKeys: ApiKeys
   setApiKeys: (k: ApiKeys) => void
+  clearKeys: () => void
   race: Race | null
   startRace: (config: RaceConfig) => Promise<void>
   stopRace: () => void
@@ -20,9 +22,19 @@ const RaceContext = createContext<RaceContextValue | null>(null)
 
 export function RaceProvider({ children }: { children: ReactNode }) {
   const [screen, setScreen] = useState<Screen>('landing')
-  const [apiKeys, setApiKeys] = useState<ApiKeys>({ openai: '', anthropic: '', google: '', xai: '' })
+  const [apiKeys, setApiKeys] = useState<ApiKeys>(() => loadSavedKeys())
   const [race, setRace] = useState<Race | null>(null)
   const abortRef = useRef(false)
+
+  const handleSetApiKeys = useCallback((k: ApiKeys) => {
+    setApiKeys(k)
+    saveKeys(k)
+  }, [])
+
+  const clearKeys = useCallback(() => {
+    clearSavedKeys()
+    setApiKeys({ openai: '', anthropic: '', google: '', xai: '' })
+  }, [])
 
   const stopRace = useCallback(() => {
     abortRef.current = true
@@ -177,7 +189,7 @@ export function RaceProvider({ children }: { children: ReactNode }) {
   }, [apiKeys])
 
   return (
-    <RaceContext.Provider value={{ screen, setScreen, apiKeys, setApiKeys, race, startRace, stopRace }}>
+    <RaceContext.Provider value={{ screen, setScreen, apiKeys, setApiKeys: handleSetApiKeys, clearKeys, race, startRace, stopRace }}>
       {children}
     </RaceContext.Provider>
   )
