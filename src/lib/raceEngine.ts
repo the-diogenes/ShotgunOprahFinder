@@ -14,6 +14,19 @@ export const MAX_LINKS_TO_MODEL = 200
 type TurnCallback = (racerId: string, turn: Turn) => void
 type StatusCallback = (racerId: string, status: RacerRun['status']) => void
 
+// Pick `count` items spread evenly across the array (avoids alphabetical bias
+// when truncating a large sorted link list).
+function sampleEvenly<T>(arr: T[], count: number): T[] {
+  if (count >= arr.length) return arr
+  if (count <= 0) return []
+  const step = arr.length / count
+  const out: T[] = []
+  for (let i = 0; i < count; i++) {
+    out.push(arr[Math.floor(i * step)])
+  }
+  return out
+}
+
 export async function runRacerTurn(
   racer: RacerRun,
   config: CompetitorConfig,
@@ -48,11 +61,25 @@ export async function runRacerTurn(
     return
   }
 
-  // Cap links sent to model for token budget
+  // Candidate links: drop already-visited pages
   const allLinks = page.links.filter((l) => !visited.includes(l))
-  const availableLinks = allLinks.slice(0, MAX_LINKS_TO_MODEL)
+
+  // Cap links sent to the model for token budget — but NEVER hide the target.
+  // (page.links is sorted alphabetically, so a naive slice both biases toward
+  // early-alphabet pages and can drop "Oprah Winfrey" entirely.)
+  let availableLinks: string[]
+  if (allLinks.length <= MAX_LINKS_TO_MODEL) {
+    availableLinks = allLinks
+  } else {
+    const targetLinks = allLinks.filter((l) => isOprah(l))
+    const rest = allLinks.filter((l) => !isOprah(l))
+    const sampled = sampleEvenly(rest, MAX_LINKS_TO_MODEL - targetLinks.length)
+    availableLinks = [...targetLinks, ...sampled].sort()
+    logger.warn('engine', `[${racer.competitorName}] Page has ${allLinks.length} links — sampled ${availableLinks.length} (target always kept)`)
+  }
 
   if (availableLinks.length === 0) {
+    logger.warn('engine', `[${racer.competitorName}] No unvisited links remain — dead end`)
     onStatus(racer.id, 'dnf_max_clicks')
     return
   }
