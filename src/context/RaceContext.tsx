@@ -4,6 +4,7 @@ import { getRandomPage } from '../lib/wikipedia'
 import { runRacerTurn, makeRacerRun } from '../lib/raceEngine'
 import { saveRace, saveTurn } from '../lib/db'
 import { loadSavedKeys, saveKeys, clearSavedKeys } from '../lib/keyStore'
+import { decryptVault } from '../lib/adminVault'
 
 type Screen = 'landing' | 'setup' | 'race' | 'results'
 
@@ -13,6 +14,7 @@ interface RaceContextValue {
   apiKeys: ApiKeys
   setApiKeys: (k: ApiKeys) => void
   clearKeys: () => void
+  unlockAdmin: (password: string) => Promise<boolean>
   race: Race | null
   startRace: (config: RaceConfig) => Promise<void>
   stopRace: () => void
@@ -35,6 +37,16 @@ export function RaceProvider({ children }: { children: ReactNode }) {
     clearSavedKeys()
     setApiKeys({ openai: '', anthropic: '', google: '', xai: '' })
   }, [])
+
+  const unlockAdmin = useCallback(async (password: string): Promise<boolean> => {
+    try {
+      const keys = await decryptVault(password)
+      handleSetApiKeys(keys)
+      return true
+    } catch {
+      return false
+    }
+  }, [handleSetApiKeys])
 
   const stopRace = useCallback(() => {
     abortRef.current = true
@@ -189,7 +201,7 @@ export function RaceProvider({ children }: { children: ReactNode }) {
   }, [apiKeys])
 
   return (
-    <RaceContext.Provider value={{ screen, setScreen, apiKeys, setApiKeys: handleSetApiKeys, clearKeys, race, startRace, stopRace }}>
+    <RaceContext.Provider value={{ screen, setScreen, apiKeys, setApiKeys: handleSetApiKeys, clearKeys, unlockAdmin, race, startRace, stopRace }}>
       {children}
     </RaceContext.Provider>
   )
